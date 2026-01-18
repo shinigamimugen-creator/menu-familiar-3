@@ -4,56 +4,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Menú Familiar</title>
+    <title>Menú Familiar Mexicali</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .hidden { display: none; }
-        body { background-color: #f1f5f9; }
+        .voted-pos { border-left: 5px solid #22c55e; background-color: #f0fdf4; }
+        .voted-neg { border-left: 5px solid #ef4444; background-color: #fef2f2; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
+<body class="bg-slate-50 pb-24 font-sans">
 
-    <div id="auth-screen" class="fixed inset-0 bg-indigo-900 z-[200] flex flex-col items-center justify-center p-6 text-white">
+    <div id="auth-screen" class="fixed inset-0 bg-indigo-900 z-[100] flex flex-col items-center justify-center p-6 text-white">
         <div class="w-full max-w-sm bg-white text-slate-800 p-8 rounded-3xl shadow-2xl">
-            <h1 class="text-2xl font-bold mb-6 text-center text-indigo-700">Bienvenido a Menú Familiar</h1>
-            
+            <h1 class="text-2xl font-bold mb-6 text-center text-indigo-700">🏠 Menú Familiar Mexicali</h1>
             <div class="space-y-4">
-                <input type="email" id="email" placeholder="Correo electrónico" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                <input type="email" id="email" placeholder="Correo" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
                 <input type="password" id="password" placeholder="Contraseña" class="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
-                
-                <button onclick="handleAuth('login')" class="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold hover:bg-indigo-700 transition">Entrar</button>
-                <button onclick="handleAuth('signup')" class="w-full border-2 border-indigo-600 text-indigo-600 p-3 rounded-xl font-bold hover:bg-indigo-50 transition">Crear Cuenta Familiar</button>
+                <button onclick="handleAuth('login')" class="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold">Entrar</button>
+                <button onclick="handleAuth('signup')" class="w-full border-2 border-indigo-600 text-indigo-600 p-3 rounded-xl font-bold">Crear Cuenta</button>
             </div>
             <p id="auth-error" class="text-red-500 text-xs mt-4 text-center"></p>
         </div>
     </div>
 
     <div id="app-content" class="hidden">
-        <nav class="bg-indigo-700 text-white p-4 sticky top-0 shadow-lg flex justify-between items-center z-40">
+        <nav class="bg-indigo-700 text-white p-3 sticky top-0 shadow-lg flex justify-between items-center z-40">
             <div>
-                <span id="user-email" class="text-[10px] block opacity-70"></span>
-                <h1 class="font-bold">🏠 Menú Familiar</h1>
+                <span id="user-display" class="text-[10px] block opacity-70 italic">Cargando...</span>
+                <h1 class="font-bold">Menú Familiar</h1>
             </div>
-            <button onclick="logout()" class="text-xs bg-red-500/20 px-2 py-1 rounded">Salir</button>
+            <button onclick="toggleAdmin()" class="text-xs bg-white/20 px-2 py-1 rounded">⚙️</button>
         </nav>
-        
-        <div class="p-4 max-w-md mx-auto space-y-6">
-            <div id="menu-semanal" class="bg-white p-4 rounded-2xl shadow-sm">
-                <p class="text-center text-slate-400">Cargando menú...</p>
+
+        <div class="p-4 max-w-md mx-auto space-y-5">
+            <div class="bg-amber-100 p-4 rounded-2xl border border-amber-200 text-center shadow-sm">
+                <h2 class="text-amber-900 font-bold text-sm mb-2">🔄 ¿Cambiar toda la semana?</h2>
+                <button onclick="voteNewMenu()" id="btn-new-menu" class="bg-amber-500 text-white px-6 py-2 rounded-xl font-bold shadow-md active:scale-95 transition w-full">
+                    Votar por Nuevo Menú (<span id="count-new-menu">0</span>/3)
+                </button>
             </div>
+
+            <div id="menu-container" class="space-y-4"></div>
+
+            <section class="bg-white p-5 rounded-3xl shadow-md border border-slate-200">
+                <h2 class="text-lg font-bold text-indigo-900 mb-3 flex items-center gap-2">🛒 Lista de Súper</h2>
+                <ul id="shopping-list" class="grid grid-cols-2 gap-2 text-xs text-slate-600"></ul>
+            </section>
+        </div>
+
+        <div id="admin-panel" class="hidden fixed bottom-0 w-full bg-slate-900 text-white p-4 flex gap-2 z-50">
+            <button onclick="forceNewMenu()" class="flex-1 bg-indigo-500 py-2 rounded-lg font-bold">Forzar Mezcla</button>
+            <button onclick="resetVotes()" class="flex-1 bg-red-500 py-2 rounded-lg font-bold text-xs">Borrar Votos</button>
+            <button onclick="location.reload()" class="bg-slate-700 px-4 py-2 rounded-lg">Salir</button>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
-        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
         
   const firebaseConfig = {
     apiKey: "AIzaSyB7tIGdnmhAGrADjBAROsmgMjTobCvTCKM",
     authDomain: "menufamiliar-b2be3.firebaseapp.com",
+    databaseURL: "https://TU_PROYECTO.firebaseio.com",
     projectId: "menufamiliar-b2be3",
     storageBucket: "menufamiliar-b2be3.firebasestorage.app",
     messagingSenderId: "1026330443761",
@@ -63,35 +79,138 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getDatabase(app);
 
-        // Lógica de Autenticación
-        window.handleAuth = async (type) => {
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            const errorDiv = document.getElementById('auth-error');
-            
-            try {
-                if (type === 'signup') await createUserWithEmailAndPassword(auth, email, pass);
-                else await signInWithEmailAndPassword(auth, email, pass);
-            } catch (error) {
-                errorDiv.innerText = "Error: " + error.message;
-            }
+        const platosDB = {
+            "Salmon a la plancha": { ing: ["Salmon", "Arroz", "Espárragos"], img: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=300" },
+            "Bulgogi": { ing: ["Res", "Arroz", "Salsa Soya"], img: "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=300" },
+            "Tacos de asada": { ing: ["Carne asada", "Tortillas", "Salsa"], img: "https://images.unsplash.com/photo-1613514785940-daed07799d9b?w=300" },
+            "Fajitas de pollo": { ing: ["Pollo", "Pimientos", "Cebolla"], img: "https://images.unsplash.com/photo-1530268729831-4b0b979154d9?w=300" },
+            "Machaca": { ing: ["Machaca", "Huevos", "Tortillas"], img: "https://i.pinimg.com/564x/41/0b/18/410b1826d00b3a853533930ab1610b44.jpg" },
+            "Tacos dorados": { ing: ["Pollo", "Tortillas", "Lechuga"], img: "https://images.unsplash.com/photo-1582582621959-48d274689260?w=300" },
+            "Enchiladas rojas": { ing: ["Tortillas", "Salsa", "Queso"], img: "https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?w=300" },
+            "Choripan": { ing: ["Chorizo", "Pan", "Chimichurri"], img: "https://images.unsplash.com/photo-1625937329368-26c68013979c?w=300" },
+            "Sandwich de atun": { ing: ["Atun", "Pan", "Mayo"], img: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=300" },
+            "Tacos de camaron": { ing: ["Camaron", "Tortillas", "Col"], img: "https://images.unsplash.com/photo-1624300603538-1207400f4116?w=300" },
+            "Ensalada de pollo": { ing: ["Pollo", "Lechuga", "Aderezo"], img: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=300" },
+            "Espagueti chipotle": { ing: ["Pasta", "Pollo", "Chipotle"], img: "https://images.unsplash.com/photo-1612967717896-d6fb6901b353?w=300" },
+            "Carne en su jugo": { ing: ["Bistec res", "Tocino", "Frijoles"], img: "https://i.pinimg.com/564x/d1/03/88/d1038858620344382541447144473241.jpg" },
+            "Caldo de res": { ing: ["Res", "Verduras"], img: "https://images.unsplash.com/photo-1604152135912-04a022e23696?w=300" },
+            "Caldo de pollo": { ing: ["Pollo", "Verduras"], img: "https://images.unsplash.com/photo-1572969057162-d3b001094575?w=300" }
         };
 
-        window.logout = () => signOut(auth);
+        let currentUser = null;
+        let appState = {};
 
-        // Observar estado del usuario
+        // --- AUTH ---
+        window.handleAuth = (type) => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+            if(type === 'signup') createUserWithEmailAndPassword(auth, email, pass);
+            else signInWithEmailAndPassword(auth, email, pass);
+        };
+
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                currentUser = user;
                 document.getElementById('auth-screen').classList.add('hidden');
                 document.getElementById('app-content').classList.remove('hidden');
-                document.getElementById('user-email').innerText = user.email;
-                // Aquí llamarías a tu función render() de la app
+                document.getElementById('user-display').innerText = "👤 " + user.email;
+                syncData();
             } else {
                 document.getElementById('auth-screen').classList.remove('hidden');
-                document.getElementById('app-content').classList.add('hidden');
             }
         });
+
+        // --- DATABASE SYNC ---
+        function syncData() {
+            onValue(ref(db, 'appState'), (snapshot) => {
+                appState = snapshot.val() || {
+                    menu: Object.keys(platosDB).sort(() => Math.random() - 0.5).slice(0, 7),
+                    votos: {},
+                    votosNewMenu: {}
+                };
+                render();
+            });
+        }
+
+        window.votar = (plato, valor) => {
+            const userId = currentUser.uid;
+            if(!appState.votos[plato]) appState.votos[plato] = {};
+            
+            if(appState.votos[plato][userId] === valor) delete appState.votos[plato][userId];
+            else appState.votos[plato][userId] = valor;
+
+            // Lógica reemplazo automático (2 votos negativos)
+            let totalNeg = Object.values(appState.votos[plato]).filter(v => v === -1).length;
+            if(totalNeg >= 2) reemplazarPlato(plato);
+            else set(ref(db, 'appState'), appState);
+        };
+
+        window.voteNewMenu = () => {
+            if(!appState.votosNewMenu) appState.votosNewMenu = {};
+            appState.votosNewMenu[currentUser.uid] = true;
+            
+            if(Object.keys(appState.votosNewMenu).length >= 3) forceNewMenu();
+            else set(ref(db, 'appState'), appState);
+        };
+
+        window.forceNewMenu = () => {
+            appState.menu = Object.keys(platosDB).sort(() => Math.random() - 0.5).slice(0, 7);
+            appState.votos = {};
+            appState.votosNewMenu = {};
+            set(ref(db, 'appState'), appState);
+        };
+
+        function reemplazarPlato(viejo) {
+            const disponibles = Object.keys(platosDB).filter(p => !appState.menu.includes(p));
+            const nuevo = disponibles[Math.floor(Math.random() * disponibles.length)];
+            appState.menu = appState.menu.map(p => p === viejo ? nuevo : p);
+            delete appState.votos[viejo];
+            set(ref(db, 'appState'), appState);
+        }
+
+        window.toggleAdmin = () => {
+            if(prompt("Clave Admin:") === "1234") 
+                document.getElementById('admin-panel').classList.toggle('hidden');
+        }
+
+        function render() {
+            const container = document.getElementById('menu-container');
+            const shopList = document.getElementById('shopping-list');
+            const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+            
+            container.innerHTML = appState.menu.map((p, i) => {
+                const v = appState.votos[p] || {};
+                const miVoto = v[currentUser.uid] || 0;
+                const pos = Object.values(v).filter(x => x === 1).length;
+                const neg = Object.values(v).filter(x => x === -1).length;
+                
+                return `
+                <div class="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 mb-4 ${miVoto===1?'voted-pos':miVoto===-1?'voted-neg':''}">
+                    <img src="${platosDB[p].img}" class="w-full h-24 object-cover">
+                    <div class="p-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <div>
+                                <span class="text-[10px] text-indigo-500 font-bold uppercase">${dias[i]}</span>
+                                <h3 class="font-bold text-slate-800">${p}</h3>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="votar('${p}', 1)" class="bg-white border p-2 rounded-xl shadow-sm ${miVoto===1?'border-green-500':''}">👍 ${pos}</button>
+                                <button onclick="votar('${p}', -1)" class="bg-white border p-2 rounded-xl shadow-sm ${miVoto===-1?'border-red-500 text-red-500':''}">👎 ${neg}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Compras
+            let todosIng = [];
+            appState.menu.forEach(p => todosIng.push(...platosDB[p].ing));
+            shopList.innerHTML = [...new Set(todosIng)].map(ing => `<li>• ${ing}</li>`).join('');
+            
+            document.getElementById('count-new-menu').innerText = Object.keys(appState.votosNewMenu || {}).length;
+        }
     </script>
 </body>
 </html>
